@@ -78,6 +78,7 @@ endforeach()
 
 # Sources without any server dependency, shared with the tests and tools.
 add_library(audio-cast-core STATIC
+	src/codepages.cpp
 	src/config.cpp
 	src/decoder.cpp
 	src/js-runtime.cpp
