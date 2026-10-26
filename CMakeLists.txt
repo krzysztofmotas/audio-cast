@@ -102,7 +102,7 @@ target_compile_definitions(audio-cast-core PUBLIC
 	HAVE_STDINT_H=1
 	PAWN_CELL_SIZE=32
 )
-target_link_libraries(audio-cast-core PUBLIC OMP-SDK Threads::Threads audiocast-asio audiocast-lame audiocast-miniz opus fdk-aac)
+target_link_libraries(audio-cast-core PUBLIC OMP-SDK Threads::Threads audiocast-asio audiocast-lame audiocast-miniz opus fdk-aac utf8proc)
 set_target_properties(audio-cast-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(WIN32)
 	target_link_libraries(audio-cast-core PUBLIC winhttp)

@@ -31,6 +31,9 @@ struct AudioCastConfig
 	bool allowPublic = false;
 	// Strings exchanged with Pawn are Windows-1252 unless this is enabled.
 	bool utf8 = false;
+	// Code page of the stream title shown by the game client: 1252 (western
+	// Europe) or 1250 (central Europe).
+	int metadataCodepage = 1252;
 	// Writes "loaded <id> (<title>)" to the server console for every song.
 	// Errors and warnings are always logged.
 	bool logSongs = false;
