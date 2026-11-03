@@ -30,6 +30,9 @@ private:
 public:
 	std::string videoId;
 	std::string title; // UTF-8
+	// From YouTube Music; empty for ordinary videos.
+	std::string artist; // UTF-8
+	std::string track;  // UTF-8
 	// From YouTube's metadata; used until the last frame is known.
 	std::uint32_t expectedDurationMs = 0;
 

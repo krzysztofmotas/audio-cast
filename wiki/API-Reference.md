@@ -28,6 +28,7 @@ Everything is declared in `audio-cast.inc`. Natives return 0 for an invalid radi
 | `Radio_GetPosition(radioid)` / `Radio_GetDuration(radioid)` | Milliseconds. |
 | `Radio_GetRequestId(radioid)` | Request ID of the current song. |
 | `Radio_GetTitle(radioid, title[], size = sizeof title)` | Current song title. |
+| `Radio_GetArtist(radioid, artist[], size = sizeof artist)` / `Radio_GetTrack(radioid, track[], size = sizeof track)` | YouTube Music artist and song name of the current song. Return 0 when the video has none. |
 | `Radio_GetVideoId(radioid, videoid[], size = sizeof videoid)` | Current YouTube video ID (11 characters). |
 | `Radio_GetQueueSize(radioid)` | Queued requests, including those still loading. |
 | `Radio_GetListenerCount(radioid)` | Open stream connections. |
@@ -64,6 +65,7 @@ The volume a player hears is the radio's times their own (50 × 50 = 25%). It is
 | `Radio_GetSearchCount(searchid)` | Number of results, -1 while running. |
 | `Radio_GetSearchResult(searchid, index, videoid[], title[], &duration_ms, videoid_size = sizeof videoid, title_size = sizeof title)` | One result. |
 | `Radio_GetSearchChannel(searchid, index, channel[], size = sizeof channel)` | The result's channel. |
+| `Radio_GetSearchViews(searchid, index, views[], size = sizeof views)` | The result's view count as a decimal string. Returns 0 when unknown. |
 | `Radio_FreeSearch(searchid)` | Frees the results (also freed when the script unloads). |
 
 ## Callbacks

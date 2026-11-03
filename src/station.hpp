@@ -22,6 +22,8 @@ struct StationStatus
 	bool loading = false;
 	int requestId = 0;
 	std::string title;
+	std::string artist;
+	std::string track;
 	std::string videoId;
 	std::uint32_t positionMs = 0;
 	std::uint32_t durationMs = 0;

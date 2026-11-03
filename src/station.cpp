@@ -192,6 +192,8 @@ StationStatus Station::status() const
 		status.paused = audible_.paused;
 		status.requestId = audible_.requestId;
 		status.title = audible_.track->title;
+		status.artist = audible_.track->artist;
+		status.track = audible_.track->track;
 		status.videoId = audible_.track->videoId;
 		status.durationMs = audible_.track->durationMs();
 		status.positionMs = static_cast<std::uint32_t>(std::min<std::uint64_t>(Mp3::framesToMs(audible_.frameIndex), status.durationMs));

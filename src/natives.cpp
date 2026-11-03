@@ -190,6 +190,28 @@ cell n_GetTitle(AMX* amx, cell* params)
 	return status.playing ? 1 : 0;
 }
 
+// native Radio_GetArtist(radioid, artist[], size = sizeof artist);
+cell n_GetArtist(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 3)) return 0;
+	const auto station = radioParam(params);
+	if (!station) return 0;
+	const StationStatus status = station->status();
+	writeString(amx, params[2], params[3], component().toPawn(status.artist));
+	return status.playing && !status.artist.empty() ? 1 : 0;
+}
+
+// native Radio_GetTrack(radioid, track[], size = sizeof track);
+cell n_GetTrack(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 3)) return 0;
+	const auto station = radioParam(params);
+	if (!station) return 0;
+	const StationStatus status = station->status();
+	writeString(amx, params[2], params[3], component().toPawn(status.track));
+	return status.playing && !status.track.empty() ? 1 : 0;
+}
+
 // native Radio_GetVideoId(radioid, videoid[], size = sizeof videoid);
 cell n_GetVideoId(AMX* amx, cell* params)
 {
@@ -339,6 +361,15 @@ cell n_GetSearchChannel(AMX* amx, cell* params)
 	return writeString(amx, params[3], params[4], component().toPawn(entry->channel)) ? 1 : 0;
 }
 
+// native Radio_GetSearchViews(searchid, index, views[], size = sizeof views);
+cell n_GetSearchViews(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 4)) return 0;
+	const SearchEntry* entry = component().searchEntry(static_cast<int>(params[1]), static_cast<int>(params[2]));
+	if (!entry || entry->views.empty()) return 0;
+	return writeString(amx, params[3], params[4], entry->views) ? 1 : 0;
+}
+
 // native Radio_FreeSearch(searchid);
 cell n_FreeSearch(AMX*, cell* params)
 {
@@ -384,6 +415,8 @@ const AMX_NATIVE_INFO kNatives[] = {
 	{ "Radio_GetDuration", guarded<n_GetDuration> },
 	{ "Radio_GetRequestId", guarded<n_GetRequestId> },
 	{ "Radio_GetTitle", guarded<n_GetTitle> },
+	{ "Radio_GetArtist", guarded<n_GetArtist> },
+	{ "Radio_GetTrack", guarded<n_GetTrack> },
 	{ "Radio_GetVideoId", guarded<n_GetVideoId> },
 	{ "Radio_GetName", guarded<n_GetName> },
 	{ "Radio_GetQueueSize", guarded<n_GetQueueSize> },
@@ -401,6 +434,7 @@ const AMX_NATIVE_INFO kNatives[] = {
 	{ "Radio_GetSearchCount", guarded<n_GetSearchCount> },
 	{ "Radio_GetSearchResult", guarded<n_GetSearchResult> },
 	{ "Radio_GetSearchChannel", guarded<n_GetSearchChannel> },
+	{ "Radio_GetSearchViews", guarded<n_GetSearchViews> },
 	{ "Radio_FreeSearch", guarded<n_FreeSearch> },
 };
 }

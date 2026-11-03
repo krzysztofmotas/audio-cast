@@ -38,6 +38,7 @@ struct SearchEntry
 	std::string videoId;
 	std::string title;   // UTF-8
 	std::string channel; // UTF-8
+	std::string views;   // decimal digits, empty when YouTube does not report it
 	std::uint32_t durationMs = 0;
 };
 

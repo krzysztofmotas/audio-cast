@@ -67,6 +67,9 @@ native Radio_GetPosition(radioid);   // milliseconds
 native Radio_GetDuration(radioid);   // milliseconds
 native Radio_GetRequestId(radioid);  // request of the current song
 native Radio_GetTitle(radioid, title[], size = sizeof title);
+// YouTube Music artist and song name; return 0 when the video has none.
+native Radio_GetArtist(radioid, artist[], size = sizeof artist);
+native Radio_GetTrack(radioid, track[], size = sizeof track);
 native Radio_GetVideoId(radioid, videoid[], size = sizeof videoid);
 native Radio_GetQueueSize(radioid);
 // Players (and other clients) currently connected to the stream.
@@ -93,6 +96,8 @@ native Radio_Search(const query[], max_results = 5);
 native Radio_GetSearchCount(searchid);
 native Radio_GetSearchResult(searchid, index, videoid[], title[], &duration_ms, videoid_size = sizeof videoid, title_size = sizeof title);
 native Radio_GetSearchChannel(searchid, index, channel[], size = sizeof channel);
+// View count as decimal digits (it can exceed a cell); returns 0 when YouTube does not report it.
+native Radio_GetSearchViews(searchid, index, views[], size = sizeof views);
 native Radio_FreeSearch(searchid);
 
 /*

@@ -343,7 +343,7 @@ void TrackLoader::processSearch(const LoadRequest& request)
 		std::vector<std::string> args = ytdlpBaseArgs();
 		args.insert(args.end(), {
 			"--flat-playlist",
-			"--print", "AUDIOCAST\t%(id)s\t%(duration)s\t%(channel,uploader)s\t%(title)s",
+			"--print", "AUDIOCAST\t%(id)s\t%(duration)s\t%(channel,uploader)s\t%(view_count)s\t%(title)s",
 			"--",
 			target,
 		});
@@ -354,14 +354,15 @@ void TrackLoader::processSearch(const LoadRequest& request)
 	{
 		if (line.compare(0, 10, "AUDIOCAST\t") != 0) continue;
 		const std::vector<std::string> fields = splitTabs(line.substr(10));
-		if (fields.size() < 4 || !Text::isVideoId(fields[0])) continue;
+		if (fields.size() < 5 || !Text::isVideoId(fields[0])) continue;
 		SearchEntry entry;
 		entry.videoId = fields[0];
 		entry.durationMs = parseDurationMs(fields[1]);
 		if (entry.durationMs == 0 || entry.durationMs > static_cast<std::uint32_t>(config_.maxDurationSec) * 1000u) continue;
 		entry.channel = fields[2] == "NA" ? std::string() : singleLine(fields[2]);
-		std::string title = fields[3];
-		for (std::size_t index = 4; index < fields.size(); ++index) title += " " + fields[index];
+		if (!fields[3].empty() && fields[3].find_first_not_of("0123456789") == std::string::npos) entry.views = fields[3];
+		std::string title = fields[4];
+		for (std::size_t index = 5; index < fields.size(); ++index) title += " " + fields[index];
 		entry.title = singleLine(title);
 		result.entries.push_back(std::move(entry));
 		if (static_cast<int>(result.entries.size()) >= wanted) break;
@@ -449,14 +450,22 @@ void TrackLoader::fetch(const LoadRequest& request, const std::string& target, c
 		std::ifstream info(infoPath, std::ios::binary);
 		std::string videoId;
 		std::string duration;
+		std::string artist;
+		std::string trackName;
 		std::string title;
 		std::getline(info, videoId);
 		std::getline(info, duration);
+		std::getline(info, artist);
+		std::getline(info, trackName);
 		std::getline(info, title);
 		track->videoId = Text::isVideoId(Text::trim(videoId)) ? Text::trim(videoId) : knownVideoId;
 		track->expectedDurationMs = parseDurationMs(Text::trim(duration));
 		title = singleLine(title);
 		track->title = title.empty() || title == "NA" ? (track->videoId.empty() ? request.query : track->videoId) : title;
+		artist = singleLine(artist);
+		trackName = singleLine(trackName);
+		track->artist = artist == "NA" ? std::string() : artist;
+		track->track = trackName == "NA" ? std::string() : trackName;
 
 		std::lock_guard<std::mutex> lock(mutex_);
 		if (!knownVideoId.empty()) busyVideos_.erase(knownVideoId);
@@ -539,7 +548,7 @@ void TrackLoader::fetch(const LoadRequest& request, const std::string& target, c
 			"-f", "bestaudio[acodec=opus]/bestaudio[ext=m4a]",
 			"--max-filesize", "150M",
 			"--match-filter", "!is_live & duration <=? " + std::to_string(config_.maxDurationSec),
-			"--print-to-file", "%(id)s\n%(duration)s\n%(title)s", infoPath.u8string(),
+			"--print-to-file", "%(id)s\n%(duration)s\n%(artist)s\n%(track)s\n%(title)s", infoPath.u8string(),
 			"-o", "-",
 			"--",
 			target,

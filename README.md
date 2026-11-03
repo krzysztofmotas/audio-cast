@@ -160,6 +160,7 @@ A complete filterscript with commands (`/radio`, `/search`, `/volume`, `/play`..
 | `Radio_IsPlaying` / `Radio_IsPaused` / `Radio_IsLoading` | Radio state. |
 | `Radio_GetPosition(radioid)` / `Radio_GetDuration(radioid)` | In milliseconds. |
 | `Radio_GetTitle(radioid, title[], size)` / `Radio_GetVideoId(...)` | Current song. |
+| `Radio_GetArtist(radioid, artist[], size)` / `Radio_GetTrack(radioid, track[], size)` | YouTube Music artist and song name of the current song. Return 0 when the video has none. |
 | `Radio_GetRequestId(radioid)` | Request ID of the current song. |
 | `Radio_GetQueueSize(radioid)` | Queued items (including those still loading). |
 | `Radio_GetListenerCount(radioid)` | Active stream connections. |
@@ -178,6 +179,7 @@ Lists YouTube results without playing anything, for example to show a dialog whe
 | `Radio_GetSearchCount(searchid)` | Number of results, or -1 while the search is still running. |
 | `Radio_GetSearchResult(searchid, index, videoid[], title[], &duration_ms, ...)` | One result: video ID, title and duration. |
 | `Radio_GetSearchChannel(searchid, index, channel[], size)` | The result's channel. |
+| `Radio_GetSearchViews(searchid, index, views[], size)` | The result's view count as a decimal string (0 when unknown). |
 | `Radio_FreeSearch(searchid)` | Frees the results. Searches are also freed when their script unloads. |
 
 ```pawn

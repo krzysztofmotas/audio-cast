@@ -159,6 +159,7 @@ Há um filterscript completo, com comandos (`/radio`, `/search`, `/volume`, `/pl
 | `Radio_IsPlaying` / `Radio_IsPaused` / `Radio_IsLoading` | Estado da rádio. |
 | `Radio_GetPosition(radioid)` / `Radio_GetDuration(radioid)` | Em milissegundos. |
 | `Radio_GetTitle(radioid, title[], size)` / `Radio_GetVideoId(...)` | Música atual. |
+| `Radio_GetArtist(radioid, artist[], size)` / `Radio_GetTrack(radioid, track[], size)` | Artista e nome da música atual no YouTube Music. Retornam 0 se o vídeo não tiver. |
 | `Radio_GetRequestId(radioid)` | ID do pedido da música atual. |
 | `Radio_GetQueueSize(radioid)` | Itens na fila (inclusive os que estão carregando). |
 | `Radio_GetListenerCount(radioid)` | Conexões ativas no stream. |
@@ -177,6 +178,7 @@ Lista resultados do YouTube sem tocar nada, por exemplo para mostrar um diálogo
 | `Radio_GetSearchCount(searchid)` | Quantidade de resultados, ou -1 enquanto a busca está rodando. |
 | `Radio_GetSearchResult(searchid, index, videoid[], title[], &duration_ms, ...)` | Um resultado: ID do vídeo, título e duração. |
 | `Radio_GetSearchChannel(searchid, index, channel[], size)` | Canal do resultado. |
+| `Radio_GetSearchViews(searchid, index, views[], size)` | Visualizações do resultado como texto decimal (0 se desconhecido). |
 | `Radio_FreeSearch(searchid)` | Libera os resultados. As buscas também são liberadas quando o script descarrega. |
 
 ```pawn

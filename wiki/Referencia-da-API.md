@@ -28,6 +28,7 @@ Tudo está declarado em `audio-cast.inc`. As natives retornam 0 para rádio, jog
 | `Radio_GetPosition(radioid)` / `Radio_GetDuration(radioid)` | Milissegundos. |
 | `Radio_GetRequestId(radioid)` | ID do pedido da música atual. |
 | `Radio_GetTitle(radioid, title[], size = sizeof title)` | Título da música atual. |
+| `Radio_GetArtist(radioid, artist[], size = sizeof artist)` / `Radio_GetTrack(radioid, track[], size = sizeof track)` | Artista e nome da música atual no YouTube Music. Retornam 0 se o vídeo não tiver. |
 | `Radio_GetVideoId(radioid, videoid[], size = sizeof videoid)` | ID do vídeo atual no YouTube (11 caracteres). |
 | `Radio_GetQueueSize(radioid)` | Pedidos na fila, inclusive os que ainda carregam. |
 | `Radio_GetListenerCount(radioid)` | Conexões de stream abertas. |
@@ -64,6 +65,7 @@ O volume que o jogador ouve é o da rádio vezes o dele (50 × 50 = 25%). Ele é
 | `Radio_GetSearchCount(searchid)` | Quantidade de resultados, -1 enquanto roda. |
 | `Radio_GetSearchResult(searchid, index, videoid[], title[], &duration_ms, videoid_size = sizeof videoid, title_size = sizeof title)` | Um resultado. |
 | `Radio_GetSearchChannel(searchid, index, channel[], size = sizeof channel)` | Canal do resultado. |
+| `Radio_GetSearchViews(searchid, index, views[], size = sizeof views)` | Visualizações do resultado como texto decimal. Retorna 0 se desconhecido. |
 | `Radio_FreeSearch(searchid)` | Libera os resultados (também liberados quando o script descarrega). |
 
 ## Callbacks
