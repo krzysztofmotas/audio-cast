@@ -6,6 +6,7 @@
 #pragma once
 
 #include "config.hpp"
+#include "film.hpp"
 #include "track-events.hpp"
 #include "station.hpp"
 #include <asio.hpp>
@@ -20,6 +21,10 @@
 
 class StreamSession;
 
+// A Range header ("bytes=...") of a file of `size` bytes as [first, last]; partial when it names one.  False when it
+// asks for nothing the file has (416).
+bool ParseByteRange(const std::string& header, std::uint64_t size, std::uint64_t& first, std::uint64_t& last, bool& partial);
+
 // Shoutcast/Icecast-style HTTP server.  Each listener is one HTTP response
 // that never ends: the radio's frames are written to it as they are produced.
 // All socket work runs on one network thread.
@@ -33,6 +38,18 @@ public:
 		int playerId = -1;
 		int radioId = 0;
 		int volume = 100; // percent, on top of the radio's volume
+	};
+
+	// What a cinema shows, as of `at`: its page polls it (/cinema/<id>/state)
+	// and plays the film from there.
+	struct CinemaState
+	{
+		std::string name;
+		std::shared_ptr<const Film> film; // null: nothing on the screen
+		std::uint32_t positionMs = 0;
+		bool paused = false;
+		bool loading = false;
+		Station::Clock::time_point at;
 	};
 
 private:
@@ -61,6 +78,7 @@ private:
 	std::map<int, int> listenerCounts_;
 	std::map<int, int> radioVolumes_; // percent; missing = 100
 	std::unordered_map<std::string, int> connectedTickets_;
+	std::map<int, CinemaState> cinemas_;
 
 	void accept();
 	void schedulePump();
@@ -68,6 +86,8 @@ private:
 	// Called by sessions once their request is read.
 	void openStream(const std::shared_ptr<StreamSession>& session, int radioId, const std::string& token, bool isHead, bool wantsMetadata);
 	void sessionClosed(StreamSession& session);
+	// /cinema/<id>/...: the page, its state and the film's files.
+	void openCinema(const std::shared_ptr<StreamSession>& session, const std::string& path, bool isHead, const std::string& range);
 	// sharedMutex_ must be held.
 	int volumeStepsLocked(int radioId, const std::string& token) const;
 
@@ -92,4 +112,6 @@ public:
 	void setRadioVolume(int radioId, int percent);
 	void setTicketVolume(const std::string& token, int percent);
 	bool ticketConnected(const std::string& token) const;
+	void setCinema(int cinemaId, CinemaState state);
+	void removeCinema(int cinemaId);
 };

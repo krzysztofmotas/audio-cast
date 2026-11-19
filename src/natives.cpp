@@ -327,6 +327,13 @@ cell n_Search(AMX* amx, cell* params)
 	return component().startSearch(amx, component().fromPawn(readString(amx, params[1])), static_cast<int>(params[2]));
 }
 
+// native Cinema_Search(const query[], max_results = 5);
+cell n_CinemaSearch(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 2)) return 0;
+	return component().startSearch(amx, component().fromPawn(readString(amx, params[1])), static_cast<int>(params[2]), true);
+}
+
 // native Radio_GetSearchCount(searchid);
 cell n_GetSearchCount(AMX*, cell* params)
 {
@@ -375,6 +382,122 @@ cell n_FreeSearch(AMX*, cell* params)
 {
 	if (!hasParams(params, 1)) return 0;
 	return component().freeSearch(static_cast<int>(params[1])) ? 1 : 0;
+}
+
+const AudioCastComponent::Cinema* cinemaParam(const cell* params)
+{
+	return component().cinema(static_cast<int>(params[1]));
+}
+
+// native Cinema_Create(const name[] = "");
+cell n_CinemaCreate(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 1)) return 0;
+	return component().createCinema(amx, component().fromPawn(readString(amx, params[1])));
+}
+
+// native Cinema_Destroy(cinemaid);
+cell n_CinemaDestroy(AMX*, cell* params)
+{
+	return hasParams(params, 1) && component().destroyCinema(static_cast<int>(params[1])) ? 1 : 0;
+}
+
+// native Cinema_IsValid(cinemaid);
+cell n_CinemaIsValid(AMX*, cell* params)
+{
+	return hasParams(params, 1) && cinemaParam(params) ? 1 : 0;
+}
+
+// native Cinema_Play(cinemaid, const query[]);
+cell n_CinemaPlay(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 2)) return 0;
+	return component().playFilm(static_cast<int>(params[1]), component().fromPawn(readString(amx, params[2])));
+}
+
+// native Cinema_Stop(cinemaid);
+cell n_CinemaStop(AMX*, cell* params)
+{
+	return hasParams(params, 1) && component().stopCinema(static_cast<int>(params[1])) ? 1 : 0;
+}
+
+// native Cinema_Pause(cinemaid);
+cell n_CinemaPause(AMX*, cell* params)
+{
+	return hasParams(params, 1) && component().pauseCinema(static_cast<int>(params[1]), true) ? 1 : 0;
+}
+
+// native Cinema_Resume(cinemaid);
+cell n_CinemaResume(AMX*, cell* params)
+{
+	return hasParams(params, 1) && component().pauseCinema(static_cast<int>(params[1]), false) ? 1 : 0;
+}
+
+// native Cinema_Seek(cinemaid, position_ms);
+cell n_CinemaSeek(AMX*, cell* params)
+{
+	if (!hasParams(params, 2) || params[2] < 0) return 0;
+	return component().seekCinema(static_cast<int>(params[1]), static_cast<std::uint32_t>(params[2])) ? 1 : 0;
+}
+
+// native Cinema_IsPlaying(cinemaid);
+cell n_CinemaIsPlaying(AMX*, cell* params)
+{
+	const auto* cinema = hasParams(params, 1) ? cinemaParam(params) : nullptr;
+	return cinema && cinema->film && !cinema->paused ? 1 : 0;
+}
+
+// native Cinema_IsPaused(cinemaid);
+cell n_CinemaIsPaused(AMX*, cell* params)
+{
+	const auto* cinema = hasParams(params, 1) ? cinemaParam(params) : nullptr;
+	return cinema && cinema->film && cinema->paused ? 1 : 0;
+}
+
+// native Cinema_IsLoading(cinemaid);
+cell n_CinemaIsLoading(AMX*, cell* params)
+{
+	const auto* cinema = hasParams(params, 1) ? cinemaParam(params) : nullptr;
+	return cinema && cinema->loadingRequestId != 0 ? 1 : 0;
+}
+
+// native Cinema_GetPosition(cinemaid);
+cell n_CinemaGetPosition(AMX*, cell* params)
+{
+	return hasParams(params, 1) ? static_cast<cell>(component().cinemaPosition(static_cast<int>(params[1]))) : 0;
+}
+
+// native Cinema_GetDuration(cinemaid);
+cell n_CinemaGetDuration(AMX*, cell* params)
+{
+	const auto* cinema = hasParams(params, 1) ? cinemaParam(params) : nullptr;
+	return cinema && cinema->film ? static_cast<cell>(cinema->film->durationMs) : 0;
+}
+
+// native Cinema_GetTitle(cinemaid, title[], size = sizeof title);
+cell n_CinemaGetTitle(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 3)) return 0;
+	const auto* cinema = cinemaParam(params);
+	if (!cinema || !cinema->film) return 0;
+	return writeString(amx, params[2], params[3], component().toPawn(cinema->film->title)) ? 1 : 0;
+}
+
+// native Cinema_GetVideoId(cinemaid, videoid[], size = sizeof videoid);
+cell n_CinemaGetVideoId(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 3)) return 0;
+	const auto* cinema = cinemaParam(params);
+	if (!cinema || !cinema->film) return 0;
+	return writeString(amx, params[2], params[3], cinema->film->videoId) ? 1 : 0;
+}
+
+// native Cinema_GetPageUrl(cinemaid, url[], size = sizeof url);
+cell n_CinemaGetPageUrl(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 3)) return 0;
+	const std::string url = component().cinemaPageUrl(static_cast<int>(params[1]));
+	return !url.empty() && writeString(amx, params[2], params[3], url) ? 1 : 0;
 }
 
 // An exception must never unwind through the AMX's C code.
@@ -431,11 +554,28 @@ const AMX_NATIVE_INFO kNatives[] = {
 	{ "Radio_SetPlayerVolume", guarded<n_SetPlayerVolume> },
 	{ "Radio_GetPlayerVolume", guarded<n_GetPlayerVolume> },
 	{ "Radio_Search", guarded<n_Search> },
+	{ "Cinema_Search", guarded<n_CinemaSearch> },
 	{ "Radio_GetSearchCount", guarded<n_GetSearchCount> },
 	{ "Radio_GetSearchResult", guarded<n_GetSearchResult> },
 	{ "Radio_GetSearchChannel", guarded<n_GetSearchChannel> },
 	{ "Radio_GetSearchViews", guarded<n_GetSearchViews> },
 	{ "Radio_FreeSearch", guarded<n_FreeSearch> },
+	{ "Cinema_Create", guarded<n_CinemaCreate> },
+	{ "Cinema_Destroy", guarded<n_CinemaDestroy> },
+	{ "Cinema_IsValid", guarded<n_CinemaIsValid> },
+	{ "Cinema_Play", guarded<n_CinemaPlay> },
+	{ "Cinema_Stop", guarded<n_CinemaStop> },
+	{ "Cinema_Pause", guarded<n_CinemaPause> },
+	{ "Cinema_Resume", guarded<n_CinemaResume> },
+	{ "Cinema_Seek", guarded<n_CinemaSeek> },
+	{ "Cinema_IsPlaying", guarded<n_CinemaIsPlaying> },
+	{ "Cinema_IsPaused", guarded<n_CinemaIsPaused> },
+	{ "Cinema_IsLoading", guarded<n_CinemaIsLoading> },
+	{ "Cinema_GetPosition", guarded<n_CinemaGetPosition> },
+	{ "Cinema_GetDuration", guarded<n_CinemaGetDuration> },
+	{ "Cinema_GetTitle", guarded<n_CinemaGetTitle> },
+	{ "Cinema_GetVideoId", guarded<n_CinemaGetVideoId> },
+	{ "Cinema_GetPageUrl", guarded<n_CinemaGetPageUrl> },
 };
 }
 

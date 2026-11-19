@@ -14,6 +14,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <thread>
 
 using tcp = asio::ip::tcp;
@@ -103,6 +105,101 @@ std::string request(int port, const std::string& path)
 		response.append(buffer, count);
 	}
 	return response.substr(0, response.find("\r\n"));
+}
+
+// The whole response to a GET of `path` with `headers` ("Name: value\r\n" lines).
+std::string fetch(int port, const std::string& path, const std::string& headers = std::string())
+{
+	asio::io_context io;
+	tcp::socket socket(io);
+	socket.connect(tcp::endpoint(asio::ip::make_address("127.0.0.1"), static_cast<unsigned short>(port)));
+	const std::string text = "GET " + path + " HTTP/1.1\r\nHost: test\r\n" + headers + "\r\n";
+	asio::write(socket, asio::buffer(text));
+	std::string response;
+	std::error_code error;
+	char buffer[8192];
+	for (;;)
+	{
+		const std::size_t count = socket.read_some(asio::buffer(buffer), error);
+		if (error) break;
+		response.append(buffer, count);
+	}
+	return response;
+}
+
+std::string body(const std::string& response)
+{
+	const std::size_t end = response.find("\r\n\r\n");
+	return end == std::string::npos ? std::string() : response.substr(end + 4);
+}
+
+std::string status(const std::string& response)
+{
+	return response.substr(0, response.find("\r\n"));
+}
+
+void testCinema(StreamServer& server, int port)
+{
+	std::uint64_t first = 0;
+	std::uint64_t last = 0;
+	bool partial = false;
+	CHECK(ParseByteRange("", 100, first, last, partial) && !partial && first == 0 && last == 99);
+	CHECK(ParseByteRange("bytes=10-19", 100, first, last, partial) && partial && first == 10 && last == 19);
+	CHECK(ParseByteRange("bytes=90-", 100, first, last, partial) && partial && first == 90 && last == 99);
+	CHECK(ParseByteRange("bytes=-5", 100, first, last, partial) && partial && first == 95 && last == 99);
+	CHECK(ParseByteRange("bytes=50-500", 100, first, last, partial) && partial && last == 99);
+	CHECK(!ParseByteRange("bytes=100-", 100, first, last, partial));
+	CHECK(ParseByteRange("bytes=0-1,5-6", 100, first, last, partial) && !partial);
+
+	namespace fs = std::filesystem;
+	const fs::path directory = fs::temp_directory_path() / "audiocast-cinema-test";
+	fs::create_directories(directory);
+	std::string video;
+	for (int index = 0; index < 1000; ++index) video += static_cast<char>('a' + index % 26);
+	std::ofstream(directory / "video.webm", std::ios::binary) << video;
+	std::ofstream(directory / "audio.webm", std::ios::binary) << "sound";
+
+	auto film = std::make_shared<Film>();
+	film->videoId = "dQw4w9WgXcQ";
+	film->title = "A \"quoted\" title";
+	film->durationMs = 60000;
+	film->directory = directory;
+	StreamServer::CinemaState state;
+	state.name = "Drive-in";
+	state.film = film;
+	state.positionMs = 5000;
+	state.paused = true;
+	state.at = Station::Clock::now();
+	server.setCinema(7, state);
+
+	CHECK(status(fetch(port, "/cinema/8/state")) == "HTTP/1.0 404 Not Found");
+	CHECK(status(fetch(port, "/cinema/7")) == "HTTP/1.0 301 Moved Permanently");
+	const std::string page = fetch(port, "/cinema/7/");
+	CHECK(status(page) == "HTTP/1.0 200 OK");
+	CHECK(page.find("Cross-Origin-Embedder-Policy: require-corp") != std::string::npos);
+	CHECK(body(page).find("<video id=\"picture\"") != std::string::npos);
+	const std::string json = body(fetch(port, "/cinema/7/state"));
+	const std::string expectedState = R"({"name":"Drive-in","film":{"id":"dQw4w9WgXcQ","title":"A \"quoted\" title","duration":60000},)"
+		R"("position":5000,"paused":true,"loading":false})";
+	CHECK(json == expectedState);
+
+	const std::string whole = fetch(port, "/cinema/7/video.webm?v=dQw4w9WgXcQ");
+	CHECK(status(whole) == "HTTP/1.0 200 OK");
+	CHECK(whole.find("Access-Control-Allow-Origin: *") != std::string::npos);
+	CHECK(body(whole) == video);
+	const std::string piece = fetch(port, "/cinema/7/video.webm", "Range: bytes=26-51\r\n");
+	CHECK(status(piece) == "HTTP/1.0 206 Partial Content");
+	CHECK(piece.find("Content-Range: bytes 26-51/1000") != std::string::npos);
+	CHECK(body(piece) == video.substr(26, 26));
+	CHECK(status(fetch(port, "/cinema/7/video.webm", "Range: bytes=5000-\r\n")) == "HTTP/1.0 416 Range Not Satisfiable");
+	CHECK(body(fetch(port, "/cinema/7/audio.webm")) == "sound");
+	CHECK(status(fetch(port, "/cinema/7/other.webm")) == "HTTP/1.0 404 Not Found");
+
+	server.removeCinema(7);
+	CHECK(status(fetch(port, "/cinema/7/state")) == "HTTP/1.0 404 Not Found");
+	std::error_code ignored;
+	fs::remove_all(directory, ignored);
+	std::printf("cinema: page, state, whole file and ranges\n");
 }
 
 Capture listen(int port, const std::string& path, std::chrono::milliseconds duration)
@@ -286,6 +383,8 @@ int main()
 		CHECK(!muted.gains.empty());
 		for (int gain : muted.gains) CHECK(gain == 0);
 	}
+
+	testCinema(server, port);
 
 	server.removeTicket("tokena");
 	server.stop();

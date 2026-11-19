@@ -54,6 +54,18 @@ struct AudioCastConfig
 	int downloadTimeoutSec = 300;
 	int workers = 2;
 	int maxListeners = 500;
+
+	// Cinemas (Cinema_*): videos kept on disk in <data_dir>/cinema as YouTube
+	// sends them (VP9 video, Opus audio), so samp-cef's CEF and browsers play
+	// them without a conversion.
+	int cinemaCacheMb = 4096;
+	int cinemaMaxHeight = 720;
+	int cinemaMaxDurationSec = 4 * 3600;
+	int cinemaDownloadTimeoutSec = 3600;
+	// A script the cinema page loads first, for clients whose browser gives a
+	// page no `cef` object of its own (a browser-based SA-MP client).  Empty:
+	// none.
+	std::string cinemaScript;
 };
 
 // Reads every setting through lookup(key), which returns an empty string for

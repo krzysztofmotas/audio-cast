@@ -6,6 +6,7 @@
 #pragma once
 
 #include "config.hpp"
+#include "film.hpp"
 #include "js-runtime.hpp"
 #include "track-events.hpp"
 #include "ytdlp.hpp"
@@ -24,13 +25,14 @@
 
 struct LoadRequest
 {
-	enum class Kind { Track, Search };
+	enum class Kind { Track, Search, Film };
 
 	Kind kind = Kind::Track;
-	int radioId = 0;
+	int radioId = 0; // the cinema ID for Kind::Film
 	int requestId = 0; // the search ID for Kind::Search
 	std::string query; // UTF-8
 	int maxResults = 0;
+	bool films = false; // a search for a cinema: results up to cinema_max_duration
 };
 
 struct SearchEntry
@@ -51,6 +53,8 @@ struct LoadResult
 	// Track: published as soon as its first seconds are ready; it keeps
 	// growing while the rest downloads.
 	std::shared_ptr<const Track> track;
+	// Film: published once both of its files are on disk.
+	std::shared_ptr<const Film> film;
 	std::vector<SearchEntry> entries;
 	std::string error;
 };
@@ -91,6 +95,12 @@ private:
 	// Songs kept for audiocast_cache_minutes after their last use.
 	std::map<std::string, Retained> retained_;
 
+	std::filesystem::path filmsDir_;
+	// Films being downloaded; a second request for one waits for it.
+	std::set<std::string> busyFilms_;
+	// Films a cinema shows: never removed to make room.
+	std::set<std::string> filmsInUse_;
+
 	void workerLoop(int index);
 	void prepare();
 	void maintenance();
@@ -98,6 +108,10 @@ private:
 	void publish(LoadResult result);
 	void processTrack(const LoadRequest& request);
 	void processSearch(const LoadRequest& request);
+	void processFilm(const LoadRequest& request);
+	bool downloadFilm(const std::string& videoId, std::string& error);
+	std::shared_ptr<const Film> filmOnDisk(const std::string& videoId) const;
+	void trimFilmCache(const std::string& keep);
 	std::shared_ptr<const Track> reuse(const std::string& videoId);
 	void fetch(const LoadRequest& request, const std::string& target, const std::string& knownVideoId);
 	std::vector<std::string> ytdlpBaseArgs() const;
@@ -111,4 +125,6 @@ public:
 
 	void submit(LoadRequest request);
 	std::vector<LoadResult> drain();
+	// Server thread: the films the cinemas show now.
+	void setFilmsInUse(std::set<std::string> videoIds);
 };

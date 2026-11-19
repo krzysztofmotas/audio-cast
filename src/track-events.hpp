@@ -116,6 +116,9 @@ struct AudioCastEvent
 		ListenerConnect,
 		ListenerDisconnect,
 		SearchResults,
+		FilmStart,
+		FilmError,
+		FilmEnd,
 	};
 
 	Type type = Type::TrackLoaded;

@@ -92,6 +92,9 @@ native Radio_GetPublicUrl(radioid, url[], size = sizeof url);
 
 // Returns a search ID (0 on failure).  max_results: 1 to 20.
 native Radio_Search(const query[], max_results = 5);
+// Radio_Search for a cinema: keeps videos up to cinema_max_duration rather than max_duration. The results are read
+// and freed like Radio_Search's, and OnRadioSearchResults reports them.
+native Cinema_Search(const query[], max_results = 5);
 // Number of results, or -1 while the search is still running / unknown ID.
 native Radio_GetSearchCount(searchid);
 native Radio_GetSearchResult(searchid, index, videoid[], title[], &duration_ms, videoid_size = sizeof videoid, title_size = sizeof title);
@@ -128,6 +131,47 @@ forward OnRadioListenerConnect(radioid, playerid);
 forward OnRadioListenerDisconnect(radioid, playerid);
 // count: number of results (0 with error[] set when the search failed).
 forward OnRadioSearchResults(searchid, count, const error[]);
+
+/*
+ * Cinemas: a YouTube video on a screen in the game, at the same moment for
+ * every player.  The video is downloaded as YouTube sends it (VP9 picture,
+ * Opus sound, kept in <data_dir>/cinema up to audiocast_cinema_cache_mb) and
+ * shown by a page the plugin serves: open Cinema_GetPageUrl in a samp-cef
+ * browser on an object (cef_create_ext_browser + cef_append_to_object).  The
+ * page follows the cinema's clock by itself; nothing is sent to the players.
+ */
+
+#define INVALID_CINEMA_ID           (0)
+#define CINEMA_URL_SIZE             (128)
+
+// Creates a cinema and returns its ID.  It belongs to the calling script and
+// is destroyed when it unloads.
+native Cinema_Create(const name[] = "");
+native Cinema_Destroy(cinemaid);
+native Cinema_IsValid(cinemaid);
+// A YouTube link, video ID or search.  Returns a request ID (0 on failure);
+// the film replaces what is on the screen once it is downloaded
+// (OnCinemaFilmStart or OnCinemaFilmError).  Live streams are not supported.
+native Cinema_Play(cinemaid, const query[]);
+// Takes the film off the screen (and forgets a Cinema_Play still loading).
+native Cinema_Stop(cinemaid);
+native Cinema_Pause(cinemaid);
+native Cinema_Resume(cinemaid);
+native Cinema_Seek(cinemaid, position_ms);
+native Cinema_IsPlaying(cinemaid);
+native Cinema_IsPaused(cinemaid);
+native Cinema_IsLoading(cinemaid);
+native Cinema_GetPosition(cinemaid); // milliseconds
+native Cinema_GetDuration(cinemaid); // milliseconds
+native Cinema_GetTitle(cinemaid, title[], size = sizeof title);
+native Cinema_GetVideoId(cinemaid, videoid[], size = sizeof videoid);
+// The page that shows the cinema: http://<public host>:<port>/cinema/<id>/
+native Cinema_GetPageUrl(cinemaid, url[], size = sizeof url);
+
+forward OnCinemaFilmStart(cinemaid, requestid, const title[], duration_ms);
+forward OnCinemaFilmError(cinemaid, requestid, const query[], const error[]);
+// The film played to its end and left the screen.
+forward OnCinemaFilmEnd(cinemaid, requestid);
 
 /*
  * Helpers
