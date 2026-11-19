@@ -77,6 +77,28 @@ private:
 	int nextRadioId_ = 1;
 	int nextRequestId_ = 1;
 
+public:
+	// A screen showing one film to everyone at the same moment.  Its page
+	// (/cinema/<id>/) follows the clock kept here.
+	struct Cinema
+	{
+		std::string name; // UTF-8
+		AMX* owner = nullptr;
+		std::shared_ptr<const Film> film; // null: nothing on the screen
+		int requestId = 0;                // of the film on the screen
+		int loadingRequestId = 0;         // of the film Cinema_Play is fetching
+		std::uint32_t positionMs = 0;     // as of `at`
+		bool paused = false;
+		Station::Clock::time_point at;
+
+		std::uint32_t position(Station::Clock::time_point now) const;
+	};
+
+private:
+	std::map<int, Cinema> cinemas_;
+	int nextCinemaId_ = 1;
+	std::set<std::string> filmsInUse_;
+
 	static AudioCastComponent* instance_;
 
 	std::string configValue(const std::string& key) const;
@@ -86,6 +108,11 @@ private:
 	void tick();
 	void deliverLoadResults();
 	void deliverEvents();
+	void deliverFilm(LoadResult& result);
+	// Films that have played to their end leave the screen.
+	void checkCinemas();
+	// The cinema's state to its page (StreamServer), and the films in use to the loader's cache.
+	void publishCinema(int cinemaId);
 
 	template <typename... Args>
 	void callPublic(const char* name, Args... args);
@@ -138,6 +165,17 @@ public:
 	bool setPlayerVolume(int playerId, int volume);
 	int playerVolume(int playerId) const;
 	std::string publicUrl(int radioId) const;
+
+	int createCinema(AMX* owner, const std::string& name);
+	bool destroyCinema(int cinemaId);
+	const Cinema* cinema(int cinemaId) const;
+	// Returns the request ID; the film replaces what is on the screen once it is on disk.
+	int playFilm(int cinemaId, const std::string& query);
+	bool stopCinema(int cinemaId);
+	bool pauseCinema(int cinemaId, bool paused);
+	bool seekCinema(int cinemaId, std::uint32_t positionMs);
+	std::uint32_t cinemaPosition(int cinemaId) const;
+	std::string cinemaPageUrl(int cinemaId) const;
 
 	static AudioCastComponent* getInstance();
 };

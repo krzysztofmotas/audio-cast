@@ -13,6 +13,7 @@
 #include <cctype>
 #include <climits>
 #include <cstdlib>
+#include <set>
 #include <vector>
 
 AudioCastComponent* AudioCastComponent::instance_ = nullptr;
@@ -112,6 +113,11 @@ void AudioCastComponent::provideConfiguration(ILogger&, IEarlyConfig& config, bo
 	config.setInt("audiocast.download_timeout", fallback.downloadTimeoutSec);
 	config.setInt("audiocast.workers", fallback.workers);
 	config.setInt("audiocast.max_listeners", fallback.maxListeners);
+	config.setInt("audiocast.cinema_cache_mb", fallback.cinemaCacheMb);
+	config.setInt("audiocast.cinema_max_height", fallback.cinemaMaxHeight);
+	config.setInt("audiocast.cinema_max_duration", fallback.cinemaMaxDurationSec);
+	config.setInt("audiocast.cinema_download_timeout", fallback.cinemaDownloadTimeoutSec);
+	config.setString("audiocast.cinema_script", "");
 }
 
 void AudioCastComponent::free()
@@ -281,6 +287,8 @@ void AudioCastComponent::stopServices()
 	loader_.stop();
 	server_.stop();
 	radios_.clear();
+	cinemas_.clear();
+	filmsInUse_.clear();
 	listeners_.clear();
 	searches_.clear();
 	events_.clear();
@@ -301,6 +309,13 @@ void AudioCastComponent::destroyRadiosOwnedBy(AMX* amx)
 		if (entry.second.owner == amx) owned.push_back(entry.first);
 	}
 	for (int radioId : owned) destroyRadio(radioId);
+
+	std::vector<int> ownedCinemas;
+	for (const auto& entry : cinemas_)
+	{
+		if (entry.second.owner == amx) ownedCinemas.push_back(entry.first);
+	}
+	for (int cinemaId : ownedCinemas) destroyCinema(cinemaId);
 }
 
 void AudioCastComponent::tick()
@@ -310,6 +325,7 @@ void AudioCastComponent::tick()
 	try
 	{
 		deliverLoadResults();
+		checkCinemas();
 		deliverEvents();
 	}
 	catch (const std::exception& exception)
@@ -326,6 +342,11 @@ void AudioCastComponent::deliverLoadResults()
 {
 	for (LoadResult& result : loader_.drain())
 	{
+		if (result.kind == LoadRequest::Kind::Film)
+		{
+			deliverFilm(result);
+			continue;
+		}
 		if (result.kind == LoadRequest::Kind::Search)
 		{
 			const auto search = searches_.find(result.requestId);
@@ -429,6 +450,15 @@ void AudioCastComponent::deliverEvents()
 			break;
 		case AudioCastEvent::Type::SearchResults:
 			callPublic("OnRadioSearchResults", event.requestId, event.value, textView);
+			break;
+		case AudioCastEvent::Type::FilmStart:
+			callPublic("OnCinemaFilmStart", event.radioId, event.requestId, textView, event.value);
+			break;
+		case AudioCastEvent::Type::FilmError:
+			callPublic("OnCinemaFilmError", event.radioId, event.requestId, textView, text2View);
+			break;
+		case AudioCastEvent::Type::FilmEnd:
+			callPublic("OnCinemaFilmEnd", event.radioId, event.requestId);
 			break;
 		}
 	}
@@ -623,4 +653,189 @@ int AudioCastComponent::searchCount(int searchId) const
 bool AudioCastComponent::freeSearch(int searchId)
 {
 	return searches_.erase(searchId) != 0;
+}
+
+// ---------------------------------------------------------------------------
+// Cinemas
+// ---------------------------------------------------------------------------
+
+std::uint32_t AudioCastComponent::Cinema::position(Station::Clock::time_point now) const
+{
+	if (!film) return 0;
+	std::uint32_t current = positionMs;
+	if (!paused)
+	{
+		const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - at).count();
+		current += static_cast<std::uint32_t>(std::max<long long>(elapsed, 0));
+	}
+	return film->durationMs > 0 ? std::min(current, film->durationMs) : current;
+}
+
+void AudioCastComponent::publishCinema(int cinemaId)
+{
+	const auto it = cinemas_.find(cinemaId);
+	if (it == cinemas_.end())
+	{
+		server_.removeCinema(cinemaId);
+	}
+	else
+	{
+		const Cinema& cinema = it->second;
+		StreamServer::CinemaState state;
+		state.name = cinema.name;
+		state.film = cinema.film;
+		state.positionMs = cinema.positionMs;
+		state.paused = cinema.paused;
+		state.loading = cinema.loadingRequestId != 0;
+		state.at = cinema.at;
+		server_.setCinema(cinemaId, std::move(state));
+	}
+
+	std::set<std::string> inUse;
+	for (const auto& entry : cinemas_)
+	{
+		if (entry.second.film) inUse.insert(entry.second.film->videoId);
+	}
+	if (inUse != filmsInUse_)
+	{
+		filmsInUse_ = inUse;
+		loader_.setFilmsInUse(std::move(inUse));
+	}
+}
+
+void AudioCastComponent::deliverFilm(LoadResult& result)
+{
+	const auto it = cinemas_.find(result.radioId);
+	// A cinema destroyed meanwhile, or a request Cinema_Play or Cinema_Stop has replaced
+	if (it == cinemas_.end() || it->second.loadingRequestId != result.requestId) return;
+	Cinema& cinema = it->second;
+	cinema.loadingRequestId = 0;
+
+	AudioCastEvent event;
+	event.radioId = result.radioId;
+	event.requestId = result.requestId;
+	if (result.film)
+	{
+		cinema.film = result.film;
+		cinema.requestId = result.requestId;
+		cinema.positionMs = 0;
+		cinema.paused = false;
+		cinema.at = Station::Clock::now();
+		event.type = AudioCastEvent::Type::FilmStart;
+		event.text = result.film->title;
+		event.value = static_cast<int>(result.film->durationMs);
+	}
+	else
+	{
+		AudioCastLogWarning("cinema " + std::to_string(result.radioId) + ": could not load '" + result.query + "': " + result.error);
+		event.type = AudioCastEvent::Type::FilmError;
+		event.text = result.query;
+		event.text2 = result.error;
+	}
+	events_.push(std::move(event));
+	publishCinema(result.radioId);
+}
+
+void AudioCastComponent::checkCinemas()
+{
+	const auto now = Station::Clock::now();
+	for (auto& entry : cinemas_)
+	{
+		Cinema& cinema = entry.second;
+		if (!cinema.film || cinema.paused || cinema.film->durationMs == 0 || cinema.position(now) < cinema.film->durationMs) continue;
+		AudioCastEvent ended;
+		ended.type = AudioCastEvent::Type::FilmEnd;
+		ended.radioId = entry.first;
+		ended.requestId = cinema.requestId;
+		events_.push(std::move(ended));
+		cinema.film.reset();
+		cinema.requestId = 0;
+		publishCinema(entry.first);
+	}
+}
+
+int AudioCastComponent::createCinema(AMX* owner, const std::string& name)
+{
+	const int cinemaId = nextCinemaId_++;
+	Cinema cinema;
+	cinema.name = name.empty() ? "Cinema " + std::to_string(cinemaId) : name;
+	cinema.owner = owner;
+	cinema.at = Station::Clock::now();
+	cinemas_.emplace(cinemaId, std::move(cinema));
+	publishCinema(cinemaId);
+	return cinemaId;
+}
+
+bool AudioCastComponent::destroyCinema(int cinemaId)
+{
+	if (cinemas_.erase(cinemaId) == 0) return false;
+	publishCinema(cinemaId);
+	return true;
+}
+
+const AudioCastComponent::Cinema* AudioCastComponent::cinema(int cinemaId) const
+{
+	const auto it = cinemas_.find(cinemaId);
+	return it == cinemas_.end() ? nullptr : &it->second;
+}
+
+int AudioCastComponent::playFilm(int cinemaId, const std::string& query)
+{
+	const auto it = cinemas_.find(cinemaId);
+	if (it == cinemas_.end() || Text::trim(query).empty()) return 0;
+
+	const int requestId = nextRequestId_++;
+	if (nextRequestId_ <= 0) nextRequestId_ = 1;
+	it->second.loadingRequestId = requestId;
+	loader_.submit(LoadRequest { LoadRequest::Kind::Film, cinemaId, requestId, query, 0 });
+	publishCinema(cinemaId);
+	return requestId;
+}
+
+bool AudioCastComponent::stopCinema(int cinemaId)
+{
+	const auto it = cinemas_.find(cinemaId);
+	if (it == cinemas_.end()) return false;
+	it->second.film.reset();
+	it->second.requestId = 0;
+	it->second.loadingRequestId = 0;
+	it->second.paused = false;
+	publishCinema(cinemaId);
+	return true;
+}
+
+bool AudioCastComponent::pauseCinema(int cinemaId, bool paused)
+{
+	const auto it = cinemas_.find(cinemaId);
+	if (it == cinemas_.end() || !it->second.film || it->second.paused == paused) return false;
+	Cinema& cinema = it->second;
+	const auto now = Station::Clock::now();
+	cinema.positionMs = cinema.position(now);
+	cinema.at = now;
+	cinema.paused = paused;
+	publishCinema(cinemaId);
+	return true;
+}
+
+bool AudioCastComponent::seekCinema(int cinemaId, std::uint32_t positionMs)
+{
+	const auto it = cinemas_.find(cinemaId);
+	if (it == cinemas_.end() || !it->second.film) return false;
+	Cinema& cinema = it->second;
+	cinema.positionMs = cinema.film->durationMs > 0 ? std::min(positionMs, cinema.film->durationMs) : positionMs;
+	cinema.at = Station::Clock::now();
+	publishCinema(cinemaId);
+	return true;
+}
+
+std::uint32_t AudioCastComponent::cinemaPosition(int cinemaId) const
+{
+	const Cinema* found = cinema(cinemaId);
+	return found ? found->position(Station::Clock::now()) : 0;
+}
+
+std::string AudioCastComponent::cinemaPageUrl(int cinemaId) const
+{
+	if (!cinema(cinemaId)) return std::string();
+	return "http://" + publicHost_ + ":" + std::to_string(publicPort_) + "/cinema/" + std::to_string(cinemaId) + "/";
 }

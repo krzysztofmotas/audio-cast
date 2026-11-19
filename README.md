@@ -240,6 +240,28 @@ forward OnRadioSearchResults(searchid, count, const error[]);
 
 Callbacks are called in every script (gamemode and filterscripts) that defines them. `OnRadioTrackLoaded` fires when a song is ready to play; `OnRadioTrackStart`/`OnRadioTrackEnd` fire when players actually **hear** it start or end.
 
+## Cinemas
+
+A cinema shows a YouTube video on a screen in the game, at the same moment for every player, through [samp-cef](https://github.com/zottce/samp-cef). The plugin downloads the video as YouTube sends it (VP9 picture, Opus sound: samp-cef's CEF has no H.264), keeps it in `<data_dir>/cinema` and serves a page that plays it in step with the cinema's clock. Open that page in a samp-cef browser on an object; the page follows pauses, seeks and new films by itself.
+
+```pawn
+new cinema = Cinema_Create("Drive-in");
+Cinema_Play(cinema, "https://www.youtube.com/watch?v=...");
+
+public OnCefInitialize(player_id, success)
+{
+    new url[CINEMA_URL_SIZE];
+    Cinema_GetPageUrl(cinema, url);
+    cef_create_ext_browser(player_id, 1, "sign", url, 5); // the texture of SA-MP's Plane005 (19479)
+    cef_append_to_object(player_id, 1, screen_object);
+    return 1;
+}
+```
+
+Natives: `Cinema_Create`, `Cinema_Destroy`, `Cinema_IsValid`, `Cinema_Play`, `Cinema_Stop`, `Cinema_Pause`, `Cinema_Resume`, `Cinema_Seek`, `Cinema_IsPlaying`, `Cinema_IsPaused`, `Cinema_IsLoading`, `Cinema_GetPosition`, `Cinema_GetDuration`, `Cinema_GetTitle`, `Cinema_GetVideoId`, `Cinema_GetPageUrl`. Callbacks: `OnCinemaFilmStart(cinemaid, requestid, const title[], duration_ms)`, `OnCinemaFilmError(cinemaid, requestid, const query[], const error[])`, `OnCinemaFilmEnd(cinemaid, requestid)`.
+
+Settings: `cinema_cache_mb` (4096, films a cinema shows are never removed), `cinema_max_height` (720), `cinema_max_duration` (14400 s), `cinema_download_timeout` (3600 s), and `cinema_script`, a script the page loads first for a client whose browser gives pages no `cef` object of its own (a browser-based SA-MP client). Pick a screen model whose texture covers it once: one that repeats its texture shows the film several times. Live streams are not supported.
+
 ## Checking your setup
 
 The `audio-cast-check` tool loads a song exactly like the plugin does and can optionally play the radio for a few seconds so you can listen in VLC:
