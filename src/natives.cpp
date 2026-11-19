@@ -327,6 +327,13 @@ cell n_Search(AMX* amx, cell* params)
 	return component().startSearch(amx, component().fromPawn(readString(amx, params[1])), static_cast<int>(params[2]));
 }
 
+// native Cinema_Search(const query[], max_results = 5);
+cell n_CinemaSearch(AMX* amx, cell* params)
+{
+	if (!hasParams(params, 2)) return 0;
+	return component().startSearch(amx, component().fromPawn(readString(amx, params[1])), static_cast<int>(params[2]), true);
+}
+
 // native Radio_GetSearchCount(searchid);
 cell n_GetSearchCount(AMX*, cell* params)
 {
@@ -547,6 +554,7 @@ const AMX_NATIVE_INFO kNatives[] = {
 	{ "Radio_SetPlayerVolume", guarded<n_SetPlayerVolume> },
 	{ "Radio_GetPlayerVolume", guarded<n_GetPlayerVolume> },
 	{ "Radio_Search", guarded<n_Search> },
+	{ "Cinema_Search", guarded<n_CinemaSearch> },
 	{ "Radio_GetSearchCount", guarded<n_GetSearchCount> },
 	{ "Radio_GetSearchResult", guarded<n_GetSearchResult> },
 	{ "Radio_GetSearchChannel", guarded<n_GetSearchChannel> },

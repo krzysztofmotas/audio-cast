@@ -615,7 +615,7 @@ std::string AudioCastComponent::publicUrl(int radioId) const
 	return "http://" + publicHost_ + ":" + std::to_string(publicPort_) + "/radio/" + std::to_string(radioId) + ".mp3";
 }
 
-int AudioCastComponent::startSearch(AMX* owner, const std::string& query, int maxResults)
+int AudioCastComponent::startSearch(AMX* owner, const std::string& query, int maxResults, bool films)
 {
 	startServices();
 	if (Text::trim(query).empty()) return 0;
@@ -632,6 +632,7 @@ int AudioCastComponent::startSearch(AMX* owner, const std::string& query, int ma
 	request.requestId = searchId;
 	request.query = query;
 	request.maxResults = maxResults;
+	request.films = films;
 	loader_.submit(std::move(request));
 	return searchId;
 }

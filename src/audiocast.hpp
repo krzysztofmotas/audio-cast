@@ -151,7 +151,7 @@ public:
 	bool destroyRadio(int radioId);
 	std::shared_ptr<Station> radio(int radioId) const;
 	int requestTrack(int radioId, const std::string& query, bool interrupt);
-	int startSearch(AMX* owner, const std::string& query, int maxResults);
+	int startSearch(AMX* owner, const std::string& query, int maxResults, bool films = false);
 	const SearchEntry* searchEntry(int searchId, int index) const;
 	int searchCount(int searchId) const;
 	bool freeSearch(int searchId);

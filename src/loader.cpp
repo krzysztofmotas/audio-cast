@@ -367,7 +367,8 @@ void TrackLoader::processSearch(const LoadRequest& request)
 		SearchEntry entry;
 		entry.videoId = fields[0];
 		entry.durationMs = parseDurationMs(fields[1]);
-		if (entry.durationMs == 0 || entry.durationMs > static_cast<std::uint32_t>(config_.maxDurationSec) * 1000u) continue;
+		const int maxDurationSec = request.films ? config_.cinemaMaxDurationSec : config_.maxDurationSec;
+		if (entry.durationMs == 0 || entry.durationMs > static_cast<std::uint32_t>(maxDurationSec) * 1000u) continue;
 		entry.channel = fields[2] == "NA" ? std::string() : singleLine(fields[2]);
 		if (!fields[3].empty() && fields[3].find_first_not_of("0123456789") == std::string::npos) entry.views = fields[3];
 		std::string title = fields[4];

@@ -32,6 +32,7 @@ struct LoadRequest
 	int requestId = 0; // the search ID for Kind::Search
 	std::string query; // UTF-8
 	int maxResults = 0;
+	bool films = false; // a search for a cinema: results up to cinema_max_duration
 };
 
 struct SearchEntry

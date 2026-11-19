@@ -59,6 +59,12 @@ constexpr std::size_t FILE_CHUNK = 64 * 1024;
 
 // Shows a cinema's film (/cinema/<id>/): plays its picture and sound in step with the cinema's clock, which it
 // reads from ./state.  samp-cef draws the page on an object; a browser-based client takes the <video> from it.
+//
+// With ?canvas=<width>x<height> the page draws the picture on a transparent canvas of that many pixels instead (the
+// texture a browser-based client makes), so a screen model larger than the screen it stands for shows nothing
+// outside it: area=<w>,<h> is the centred part of the canvas the film fills (fractions, default the whole canvas),
+// fit=contain|cover|fill how it fills it, brightness=<factor> lightens a screen the game's lighting darkens
+// (webbrightness=<factor> instead in a browser-based client).
 const char* const kCinemaPage = R"AUDIOCAST_PAGE(<!doctype html>
 <html>
 <head>
@@ -66,17 +72,67 @@ const char* const kCinemaPage = R"AUDIOCAST_PAGE(<!doctype html>
 <title>AudioCast cinema</title>
 @SCRIPT@<style>
 html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+html.drawn, html.drawn body { background: transparent; }
 video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+html.drawn video { position: absolute; width: 1px; height: 1px; opacity: 0; }
+canvas { display: none; }
+html.drawn canvas { display: block; width: 100%; height: 100%; }
 </style>
 </head>
 <body>
 <video id="picture" muted playsinline preload="auto"></video>
+<canvas id="screen" data-cef-surface></canvas>
 <audio id="sound" preload="auto"></audio>
 <script>
 "use strict";
 (() => {
   const picture = document.getElementById("picture");
   const sound = document.getElementById("sound");
+
+  const options = new URLSearchParams(location.search);
+  const canvasSize = /^(\d{1,4})x(\d{1,4})$/.exec(options.get("canvas") || "");
+  const screen = document.getElementById("screen");
+  if (canvasSize) {
+    document.documentElement.classList.add("drawn");
+    screen.width = Number(canvasSize[1]);
+    screen.height = Number(canvasSize[2]);
+    const fraction = (text) => Math.min(Math.max(Number(text) || 1, 0.01), 1);
+    const [areaWidth, areaHeight] = (options.get("area") || "1,1").split(",").map(fraction);
+    const fit = options.get("fit") || "contain";
+    // A browser-based client shows the page in a frame of its own page and draws the screen darker than samp-cef
+    const framed = window.parent !== window && options.has("webbrightness");
+    const brightness = Math.min(Math.max(Number(options.get(framed ? "webbrightness" : "brightness")) || 1, 0.1), 4);
+    const context = screen.getContext("2d");
+    const area = { width: screen.width * areaWidth, height: screen.height * areaHeight };
+    area.x = (screen.width - area.width) / 2;
+    area.y = (screen.height - area.height) / 2;
+    const draw = () => {
+      context.clearRect(0, 0, screen.width, screen.height);
+      context.fillStyle = "#000";
+      context.fillRect(area.x, area.y, area.width, area.height);
+      if (picture.readyState < 2 || !picture.videoWidth) return;
+      const film = picture.videoWidth / picture.videoHeight;
+      const target = area.width / area.height;
+      let width = area.width, height = area.height;
+      if (fit === "contain") film > target ? height = width / film : width = height * film;
+      else if (fit === "cover") film > target ? width = height * film : height = width / film;
+      context.save();
+      context.beginPath();
+      context.rect(area.x, area.y, area.width, area.height);
+      context.clip();
+      if (brightness !== 1) context.filter = `brightness(${brightness})`;
+      context.drawImage(picture, area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height);
+      context.restore();
+    };
+    const onFrame = () => {
+      draw();
+      picture.requestVideoFrameCallback(onFrame);
+    };
+    if (picture.requestVideoFrameCallback) picture.requestVideoFrameCallback(onFrame);
+    else setInterval(draw, 33);
+    for (const event of ["loadeddata", "seeked", "emptied"]) picture.addEventListener(event, draw);
+    draw();
+  }
   // How far the sound may get from the cinema's clock, and the picture from the sound, before a seek (seconds)
   const SOUND_DRIFT = 0.75;
   const PICTURE_DRIFT = 0.15;

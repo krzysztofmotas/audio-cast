@@ -92,6 +92,9 @@ native Radio_GetPublicUrl(radioid, url[], size = sizeof url);
 
 // Returns a search ID (0 on failure).  max_results: 1 to 20.
 native Radio_Search(const query[], max_results = 5);
+// Radio_Search for a cinema: keeps videos up to cinema_max_duration rather than max_duration. The results are read
+// and freed like Radio_Search's, and OnRadioSearchResults reports them.
+native Cinema_Search(const query[], max_results = 5);
 // Number of results, or -1 while the search is still running / unknown ID.
 native Radio_GetSearchCount(searchid);
 native Radio_GetSearchResult(searchid, index, videoid[], title[], &duration_ms, videoid_size = sizeof videoid, title_size = sizeof title);
