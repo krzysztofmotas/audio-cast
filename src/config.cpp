@@ -15,7 +15,7 @@ namespace
 const char* const kKeys[] = {
 	"bind", "port", "public_host", "public_port", "burst_ms", "bitrate", "normalize", "allow_public", "utf8", "metadata_codepage", "log_songs",
 	"ytdlp", "js_runtime", "cookies", "data_dir", "cache_minutes", "max_duration", "download_timeout", "workers", "max_listeners",
-	"cinema_cache_mb", "cinema_max_height", "cinema_max_duration", "cinema_download_timeout", "cinema_script",
+	"cinema_cache_mb", "cinema_max_height", "cinema_max_duration", "cinema_download_timeout", "cinema_script", "ffmpeg",
 	nullptr,
 };
 
@@ -94,6 +94,7 @@ AudioCastConfig LoadAudioCastConfig(const std::function<std::string(const std::s
 	readInt("cinema_max_duration", config.cinemaMaxDurationSec, 10, 24 * 3600);
 	readInt("cinema_download_timeout", config.cinemaDownloadTimeoutSec, 30, 24 * 3600);
 	readString("cinema_script", config.cinemaScript);
+	readString("ffmpeg", config.ffmpeg);
 
 	// libmp3lame only produces these MPEG-1 Layer III bitrates.
 	static const int kBitrates[] = { 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320 };

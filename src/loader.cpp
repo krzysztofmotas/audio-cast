@@ -680,10 +680,12 @@ bool TrackLoader::downloadFilm(const std::string& videoId, std::string& error)
 	// Sound first: it is small, and its run checks the video can be shown at all.
 	const std::vector<std::vector<std::string>> runs {
 		{
-			"-f", "bestaudio[acodec=opus]",
+			// Opus as it comes; another codec (some videos come with AAC alone) is turned into Opus below
+			"-f", config_.ffmpeg.empty() ? "bestaudio[acodec=opus]" : "bestaudio[acodec=opus]/bestaudio",
 			"--match-filter", "!is_live & duration <=? " + std::to_string(config_.cinemaMaxDurationSec),
 			"--print-to-file", "%(id)s\n%(duration)s\n%(title)s", (part / "info.txt").u8string(),
-			"-o", (part / "audio.webm").u8string(),
+			"--print-to-file", "%(acodec)s", (part / "acodec.txt").u8string(),
+			"-o", (part / "audio.source").u8string(),
 		},
 		{
 			// samp-cef's CEF has no H.264, so VP9 only, in either of the names YouTube gives it.
@@ -702,7 +704,7 @@ bool TrackLoader::downloadFilm(const std::string& videoId, std::string& error)
 			args.insert(args.end(), { "--no-part", "--", url });
 			result = RunProcess(args, config_.cinemaDownloadTimeoutSec, stopping_);
 		}
-		const fs::path file = part / (run == runs.front() ? "audio.webm" : "video.webm");
+		const fs::path file = part / (run == runs.front() ? "audio.source" : "video.webm");
 		if (!result.started || result.timedOut || result.cancelled || result.exitCode != 0 || !fs::is_regular_file(file, ignored))
 		{
 			if (stopping_) error = "cancelled";
@@ -715,12 +717,50 @@ bool TrackLoader::downloadFilm(const std::string& videoId, std::string& error)
 		}
 	}
 
+	if (!makeOpusSound(part, error))
+	{
+		fs::remove_all(part, ignored);
+		return false;
+	}
+
 	std::error_code moved;
 	fs::rename(part, directory, moved);
 	if (moved)
 	{
 		error = "could not keep the film in '" + directory.u8string() + "': " + moved.message();
 		fs::remove_all(part, ignored);
+		return false;
+	}
+	return true;
+}
+
+bool TrackLoader::makeOpusSound(const fs::path& part, std::string& error)
+{
+	const fs::path source = part / "audio.source";
+	const fs::path sound = part / "audio.webm";
+	std::string codec;
+	{
+		std::ifstream file(part / "acodec.txt");
+		std::getline(file, codec);
+	}
+	codec = Text::trim(codec);
+	std::error_code failed;
+	fs::remove(part / "acodec.txt", failed);
+	if (codec == "opus")
+	{
+		fs::rename(source, sound, failed);
+		if (failed) error = "could not keep the film's sound: " + failed.message();
+		return !failed;
+	}
+
+	const ProcessResult result = RunProcess({
+		config_.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+		"-i", source.u8string(), "-vn", "-c:a", "libopus", "-b:a", "128k", "-f", "webm", sound.u8string(),
+	}, config_.cinemaDownloadTimeoutSec, stopping_);
+	fs::remove(source, failed);
+	if (!result.started || result.timedOut || result.cancelled || result.exitCode != 0 || !fs::is_regular_file(sound, failed))
+	{
+		error = stopping_ ? "cancelled" : "turning the film's " + codec + " sound into Opus: " + describeFailure(result, "ffmpeg");
 		return false;
 	}
 	return true;

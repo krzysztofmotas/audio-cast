@@ -66,6 +66,9 @@ struct AudioCastConfig
 	// page no `cef` object of its own (a browser-based SA-MP client).  Empty:
 	// none.
 	std::string cinemaScript;
+	// ffmpeg, which turns a film's sound into Opus when YouTube offers it only in another codec (AAC).  Empty:
+	// such films are refused.
+	std::string ffmpeg = "ffmpeg";
 };
 
 // Reads every setting through lookup(key), which returns an empty string for

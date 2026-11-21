@@ -110,6 +110,8 @@ private:
 	void processSearch(const LoadRequest& request);
 	void processFilm(const LoadRequest& request);
 	bool downloadFilm(const std::string& videoId, std::string& error);
+	// Leaves part/audio.webm Opus: as downloaded, or converted with ffmpeg from another codec
+	bool makeOpusSound(const std::filesystem::path& part, std::string& error);
 	std::shared_ptr<const Film> filmOnDisk(const std::string& videoId) const;
 	void trimFilmCache(const std::string& keep);
 	std::shared_ptr<const Track> reuse(const std::string& videoId);
